@@ -1,0 +1,297 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  isGuest       Boolean   @default(false)
+  guestId       String?   @unique
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  profile       Profile?
+  progress      UserProgress?
+  attempts      Attempt[]
+  certificates  Certificate[]
+  achievements  Achievement[]
+  words         Word[]
+  statistics    Statistics?
+  streak        Streak?
+  settings      Settings?
+  errors        UserError[]
+
+  @@index([email])
+  @@index([guestId])
+}
+
+model Profile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  name      String
+  avatarUrl String?
+  bio       String?
+  timezone  String   @default("UTC")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserProgress {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  currentLevelId   String   @default("A0")
+  currentQuestion  Int      @default(0)
+  totalCompleted   Int      @default(0)
+  correctAnswers   Int      @default(0)
+  wrongAnswers     Int      @default(0)
+  totalTime        Int      @default(0)
+  learnedWords     Int      @default(0)
+  lastActivityAt   DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Level {
+  id         String   @id @default(cuid())
+  levelId    String   @unique
+  name       String
+  city       String
+  order      Int
+  strictness String   @default("soft")
+  color      String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  questions    Question[]
+  certificates Certificate[]
+  achievements Achievement[]
+  grammarArticles GrammarArticle[]
+}
+
+model Question {
+  id                String   @id @default(cuid())
+  levelId           String
+  type              String
+  question          String   @db.Text
+  correctAnswer     String   @db.Text
+  acceptableAnswers String[] @db.Text
+  hint              String   @db.Text
+  explanation       String   @db.Text
+  audioPrompt       String   @db.Text
+  gifPrompt         String   @db.Text
+  imagePrompt       String   @db.Text
+  order             Int
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  level    Level     @relation(fields: [levelId], references: [levelId])
+  attempts Attempt[]
+
+  @@index([levelId])
+  @@index([levelId, order])
+}
+
+model Attempt {
+  id              String   @id @default(cuid())
+  userId          String
+  questionId      String
+  userAnswer      String   @db.Text
+  correct         Boolean
+  accuracy        Int
+  mistakes        String[] @db.Text
+  correctAnswer   String   @db.Text
+  explanation     String   @db.Text
+  skipped         Boolean  @default(false)
+  timeSpent       Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([questionId])
+  @@index([userId, correct])
+  @@index([userId, createdAt])
+}
+
+model UserError {
+  id          String   @id @default(cuid())
+  userId      String
+  questionId  String
+  userAnswer  String   @db.Text
+  correctAnswer String @db.Text
+  explanation String   @db.Text
+  resolved    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  resolvedAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, resolved])
+}
+
+model Certificate {
+  id                String   @id @default(cuid())
+  userId            String
+  levelId           String
+  userName          String
+  isGolden          Boolean  @default(false)
+  certificateNumber String   @unique
+  issuedAt          DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  level Level @relation(fields: [levelId], references: [levelId])
+
+  @@index([userId])
+  @@index([userId, levelId])
+}
+
+model Achievement {
+  id         String   @id @default(cuid())
+  userId     String
+  levelId    String
+  city       String
+  unlocked   Boolean  @default(false)
+  unlockedAt DateTime?
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  level Level @relation(fields: [levelId], references: [levelId])
+
+  @@unique([userId, levelId])
+  @@index([userId])
+}
+
+model Word {
+  id         String   @id @default(cuid())
+  userId     String
+  word       String
+  translation String
+  example    String   @db.Text
+  levelId    String
+  learnedAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, word])
+  @@index([userId])
+}
+
+model GrammarArticle {
+  id         String   @id @default(cuid())
+  levelId    String
+  title      String
+  content    String   @db.Text
+  searchTags String[]
+  order      Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  level Level @relation(fields: [levelId], references: [levelId])
+
+  @@index([levelId])
+  @@index([searchTags])
+}
+
+model Statistics {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  totalSessions Int      @default(0)
+  totalTime     Int      @default(0)
+  totalCorrect  Int      @default(0)
+  totalWrong    Int      @default(0)
+  totalSkipped  Int      @default(0)
+  longestStreak Int      @default(0)
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Streak {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  current     Int      @default(0)
+  longest     Int      @default(0)
+  lastDate    DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime
+  questions Int      @default(0)
+  correct   Int      @default(0)
+  wrong     Int      @default(0)
+  timeSpent Int      @default(0)
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([userId, date])
+}
+
+model Settings {
+  id            String  @id @default(cuid())
+  userId        String  @unique
+  theme         String  @default("system")
+  soundEnabled  Boolean @default(true)
+  voiceEnabled  Boolean @default(true)
+  concentration Boolean @default(false)
+  showHints     Boolean @default(true)
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
